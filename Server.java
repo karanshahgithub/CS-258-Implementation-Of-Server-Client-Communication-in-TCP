@@ -10,7 +10,7 @@ public class Server {
 	private static final int PORT = 5000;
 	private static final String INITIATE_MESSAGE = "Network";
 	private static final String SUCCESS_MESSAGE = "Connection Success";
-	private static int[] receivingBuffer = new int[200];
+	private static int[] receivingBuffer = new int[10000000];
 	private static int lastReadByte = 0;
 	private static int lastByteAcknowledged = 0;
 
@@ -63,15 +63,16 @@ public class Server {
 			// Storing value in array
 			for(int i=0;i<count;i++){
 				receivingArray[i] = dataInput.readInt();
+				receivingBuffer[lastReadByte] = receivingArray[i];
+				lastReadByte++;
+
 				System.out.println("---receiving array---"+receivingArray[i]);
 
-				dataOutput.writeInt(receivingArray[lastByteAcknowledged]);
-				receivingArray[lastByteAcknowledged] = 0;
+				dataOutput.writeInt(receivingBuffer[lastByteAcknowledged]);
+				
 				lastByteAcknowledged++;
 
-				if(lastByteAcknowledged>199)
-					lastByteAcknowledged=0;
-				//System.out.println(i);
+				
 			}
 
 

@@ -48,7 +48,7 @@ public class Client {
 
 	public static void serverCommunication(Socket socket, DataOutputStream dataOutput) {
 
-		System.out.println("karan");
+		
 		// read the server response message
 		DataInputStream dataInput = null;
 
@@ -56,11 +56,11 @@ public class Client {
 			dataInput = new DataInputStream(socket.getInputStream());
 
 			// entering sequence numbers
-			int[] application_Array = new int[500];
+			int[] application_Array = new int[10000000];
 
-			for(int i=0,j=1;i<500;i++){
+			for(int i=0,j=1;i<10000000;i++){
 
-				if(j%200==0){
+				if(j%65537==0){
 					j=1;
 				}
 
@@ -72,18 +72,18 @@ public class Client {
 			int noofBytesAcknowledged = 0;
 			int lastByteAcknowledged = 0;
 			int lastByteSent = 0;
-			int lastByteWritten = 200;
+			int lastByteWritten = 1000;
 			int[] sendingArray;
 			int check2 = 0;
 			
 			// Sending packets by sliding window
 			
-			while(lastByteSent<500)
+			while(lastByteSent<10000000)
 			{
 				
 				sendingArray = new int[lastByteWritten-lastByteSent];
 				dataOutput.writeInt(lastByteWritten-lastByteSent);
-				System.out.println(lastByteWritten-lastByteSent);
+				System.out.println("window size"+(lastByteWritten-lastByteSent));
 
 				
 
@@ -95,16 +95,12 @@ public class Client {
 					System.out.println("---filling sendingArray---"+sendingArray[i]);
 					lastByteSent++;
 
-					int AcknowledgedByte = dataInput.readInt();
+					long AcknowledgedByte = dataInput.readLong();
 					System.out.println("---AcknowledgeByteAcknowledgedByte---"+AcknowledgedByte);
 
-					/*
-					if(AcknowledgedByte==-1){
-						lastByteAcknowledged--;
-						break;
-					}
-					*/
-					noofBytesAcknowledged++;
+					
+					if(AcknowledgedByte!=0)
+						noofBytesAcknowledged++;
 
 
 				lastByteAcknowledged++;
@@ -112,21 +108,22 @@ public class Client {
 
 			
 			lastByteWritten = lastByteSent+noofBytesAcknowledged;
-
-			// checking if lastByteWritten exceeds 
-			noofBytesAcknowledged = 0;
-			
 			System.out.println("--- phase 1---lastByteWritten "+lastByteWritten);
 			System.out.println("--- phase 1---noofBytesAcknowledged "+noofBytesAcknowledged);
 			System.out.println("--- phase 1---lastByteSent "+lastByteSent);
 
+			// checking if lastByteWritten exceeds 
+			noofBytesAcknowledged = 0;
+			
+			
+
 			// checking lastByteWritten
-			if(lastByteWritten>500 && check2==0){
-				lastByteWritten = 500;
+			if(lastByteWritten>=10000000 && check2==0){
+				lastByteWritten = 10000000;
 				check2 = -1;
 			}
 
-			else if(lastByteWritten>500 && check2==-1){
+			else if(lastByteWritten>=10000000 && check2==-1){
 				break;
 			}
 
