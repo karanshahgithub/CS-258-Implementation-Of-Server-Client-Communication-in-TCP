@@ -18,8 +18,8 @@ public class Server {
 	private static final int PORT = 5000;
 	private static final String INITIATE_MESSAGE = "Network";
 	private static final String SUCCESS_MESSAGE = "Connection Success";
-	private static final int PACKET_COUNT = 32768;
-	private static final int SEQ_LIMIT = 65536;
+	private static final int PACKET_COUNT = 32 ;
+	private static final int SEQ_LIMIT = 64;
 
 	public static void main(String args[]) throws IOException, ClassNotFoundException {
 
@@ -38,7 +38,7 @@ public class Server {
 		if (message.equals(INITIATE_MESSAGE)) {
 			System.out.println(SUCCESS_MESSAGE);
 			dataOutput.writeUTF(SUCCESS_MESSAGE);
-
+			
 			clientCommunication(dataInput, dataOutput);
 		}
 
@@ -66,7 +66,7 @@ public class Server {
 		int totalAcknowledged = 0;
 		int receivedPacketCount = 0;
 
-		double totalGoodput= 0;
+		double averageGoodput= 0;
 
 		boolean continueTranmission = true;
 
@@ -89,7 +89,6 @@ public class Server {
 					} 
 
 					// Storing packets into the receiving buffer
-					//receivingBuffer[lastByteRcvd] = lastByteRead;
 					receivingBuffer.add(lastByteRead);
 					receivedPacketCount++;
 
@@ -125,7 +124,7 @@ public class Server {
 
 					if (receivedPacketCount % 1000 == 0) { 
 						double goodput = (receivedPacketCount * 1.0) / (receivedPacketCount + missingPacketCount);
-						totalGoodput += goodput;
+						averageGoodput += (goodput - averageGoodput) / (receivedPacketCount/1000);
 						System.out.println("Goodput after receving " + receivedPacketCount + " : " +  goodput); 
 					}
 
@@ -196,9 +195,6 @@ public class Server {
 			
 			System.out.println("Total Acknowledged : " + totalAcknowledged);
 			System.out.println("Total Received : " + receivedPacketCount);
-			totalGoodput += (receivedPacketCount * 1.0) / (receivedPacketCount + missingPacketCount);
-			double averageGoodput = totalGoodput/(receivedPacketCount/1000);
-			System.out.println("Average goodput : " + averageGoodput);
 			System.out.println("Average goodput : " + averageGoodput);
 
 		} catch (IOException e) {
