@@ -7,17 +7,19 @@ public class Client {
 
 	private static final String INITIATE_MESSAGE = "Network";
 	private static final int PORT = 5000;
-	private static final int PACKET_COUNT = 10000000;
-	private static final int SEQ_LIMIT = 65536;
+	private static final int PACKET_COUNT = 1000;
+	private static final int SEQ_LIMIT = 64;
 	private static final int RETRANSMISSION_INTERVAL = 100;
 	
 	private static int[] sendingArray;
 	private static int windowSize = 0;
+	private static int totalSentCount = 0;
+	
 
 	public static void main(String[] args)
 			throws UnknownHostException, IOException, ClassNotFoundException, InterruptedException {
 		// get the localhost IP address -- to be changed to the Server IP
-		InetAddress host = InetAddress.getLocalHost();
+		InetAddress host =  InetAddress.getLocalHost(); //InetAddress.getByName("10.0.0.122");
 		Socket socket = null;
 		DataOutputStream dataOutput = null;
 		DataInputStream dataInput;
@@ -60,7 +62,7 @@ public class Client {
 		int lastByteWritten = 0;
 		int acknowledgedByte = 0;
 		int noOfBytesAcknowledged = 0;
-		int totalSentCount = 0;
+		
 		
 		try {
 			// entering sequence numbers
@@ -96,10 +98,12 @@ public class Client {
 					//Writing packets to the sending window
 					sendingArray[i] = application_Array[lastByteWritten];
 					lastByteWritten++;
-
+					
+					System.out.println("Current i : " + i);
+					System.out.println("Last Byte Written " + lastByteWritten);
 					//Generate probability of 1% by randomly sampling one integer from 100 values
 					if (rnd.nextInt(100) == 0) {
-						//System.out.println("Dropped : " + sendingArray[i]);
+						System.out.println("Dropped : " + i );
 						droppedPackets.add(sendingArray[i]);
 						continue;
 					}
@@ -107,9 +111,11 @@ public class Client {
 					//Sending the packet to the server
 					dataOutput.writeInt(sendingArray[i]);
 					totalSentCount++;
+					System.out.println("Sent count : " + totalSentCount);
 					list.add(sendingArray[i]);
 					//System.out.println("Sending : " + sendingArray[i]);
 					lastByteSent++;
+					System.out.println("Last Byte Sent : " +lastByteSent);
 
 				}
 				if(lastByteWritten == PACKET_COUNT) {
@@ -142,6 +148,7 @@ public class Client {
 				int packet = droppedPackets.poll();
 				dataOutput.writeInt(packet);
 				totalSentCount++;
+				System.out.println("Sent count : " + totalSentCount);
 				list.add(packet);
 				//System.out.println("Sending : " + packet);
 			}
@@ -175,6 +182,10 @@ public class Client {
 				continue;
 			}
 			sendingArray[index] = packet;
+			
+			dataOutput.writeInt(sendingArray[index]);
+			totalSentCount++;
+			
 			index++;
 		}
 		return index;
