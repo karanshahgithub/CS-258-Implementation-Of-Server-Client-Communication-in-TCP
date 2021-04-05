@@ -7,10 +7,12 @@ public class Client {
 
 	private static final String INITIATE_MESSAGE = "Network";
 	private static final int PORT = 5000;
-	private static final int PACKET_COUNT = 10000;
-	private static final int SEQ_LIMIT = 200;
+	private static final int PACKET_COUNT = 10000000;
+	private static final int SEQ_LIMIT = 65536;
 	private static final int RETRANSMISSION_INTERVAL = 100;
 	
+	private static int[] sendingArray;
+	private static int windowSize = 0;
 
 	public static void main(String[] args)
 			throws UnknownHostException, IOException, ClassNotFoundException, InterruptedException {
@@ -44,21 +46,21 @@ public class Client {
 		// close resources
 		dataOutput.close();
 		dataInput.close();
+		socket.close();
 	}
 
 	public static void serverCommunication(DataOutputStream dataOutput, DataInputStream dataInput) {
 		Queue<Integer> droppedPackets = new LinkedList<Integer>();
 		Random rnd = new Random();
-		int[] sendingArray;
+		List<Integer> list = new ArrayList<Integer>();
 		
-		int windowSize = 100;
+
 		int retransmissionSequence = RETRANSMISSION_INTERVAL;
-		//int lastByteAcknowledged = 0;
 		int lastByteSent = 0;
 		int lastByteWritten = 0;
 		int acknowledgedByte = 0;
 		int noOfBytesAcknowledged = 0;
-		//int check2 = 0;
+		int totalSentCount = 0;
 		
 		try {
 			// entering sequence numbers
@@ -70,13 +72,26 @@ public class Client {
 
 			// Sending packets by sliding window
 			while (lastByteWritten < PACKET_COUNT) {
-
+				//Get window size from server
+				windowSize = dataInput.readInt();
+				System.out.println("Window size : " + windowSize);
+				
 				//Creating a new sender window
 				sendingArray = new int[windowSize];
 				noOfBytesAcknowledged = 0;
-
+				acknowledgedByte = 0;
+				int i=0;
+				
+				
+				//Retransmission of dropped packets after a fixed interval of sequences
+				if(lastByteWritten > retransmissionSequence) {
+					i = retransmitDroppedPackets(dataOutput, dataInput, droppedPackets, rnd, i);
+					retransmissionSequence = lastByteWritten + RETRANSMISSION_INTERVAL;
+				}
+				
+				
 				//Processing for every byte in the window
-				for (int i = 0; i < windowSize && lastByteWritten < PACKET_COUNT; i++) {
+				for (; i < windowSize && lastByteWritten < PACKET_COUNT; i++) {
 					
 					//Writing packets to the sending window
 					sendingArray[i] = application_Array[lastByteWritten];
@@ -84,53 +99,63 @@ public class Client {
 
 					//Generate probability of 1% by randomly sampling one integer from 100 values
 					if (rnd.nextInt(100) == 0) {
-						System.out.println("dropped " + sendingArray[i]);
+						//System.out.println("Dropped : " + sendingArray[i]);
 						droppedPackets.add(sendingArray[i]);
 						continue;
 					}
-
+					
 					//Sending the packet to the server
 					dataOutput.writeInt(sendingArray[i]);
-					System.out.println("---filling sendingArray---" + sendingArray[i]);
+					totalSentCount++;
+					list.add(sendingArray[i]);
+					//System.out.println("Sending : " + sendingArray[i]);
 					lastByteSent++;
 
+				}
+				if(lastByteWritten == PACKET_COUNT) {
+					//Message server that client is done sending packets
+					dataOutput.writeInt(-2);
+				}else {
+					dataOutput.writeInt(-1);
+				}
+
+				//Acknowledging packets from server till server sends a -1
+				while(acknowledgedByte != -1) {
 					//Reading acknowledgment from the server
 					acknowledgedByte = dataInput.readInt();
-					System.out.println("---AcknowledgeByte---" + acknowledgedByte);
+					list.remove(new Integer(acknowledgedByte));
+					//System.out.println("Acknowledged : " + acknowledgedByte);
 
-					if (acknowledgedByte != 0) //
+					if (acknowledgedByte != -1)
 						noOfBytesAcknowledged++;
-					//lastByteAcknowledged++;
 				}
-
-				// lastByteWritten = lastByteSent+noofBytesAcknowledged;
-				//windowSize = noofBytesAcknowledged;
-				System.out.println("--- phase 1---lastByteWritten " + lastByteWritten);
+				
 				System.out.println("--- phase 1---noofBytesAcknowledged " + noOfBytesAcknowledged);
+				System.out.println("--- phase 1---lastByteWritten " + lastByteWritten);
 				System.out.println("--- phase 1---lastByteSent " + lastByteSent);
-
-				//Retransmission of dropped packets after a fixed interval of sequences
-				if(lastByteWritten > retransmissionSequence) {
-					retransmitDroppedPackets(dataOutput, dataInput, droppedPackets, rnd);
-					retransmissionSequence = lastByteWritten + RETRANSMISSION_INTERVAL;
-				}
-
-				// checking lastByteWritten
-				/*
-				 * if(lastByteWritten>=PACKET_COUNT && check2==0){ lastByteWritten =
-				 * PACKET_COUNT; check2 = -1; }
-				 * 
-				 * else if(lastByteWritten>=PACKET_COUNT && check2==-1){ break; }
-				 */
-
-				// dataOutput.writeInt(0);
 			}
 			
-			//Retransmit remaining dropped packets in list
-			retransmitDroppedPackets(dataOutput, dataInput, droppedPackets, rnd);
 			
-			//Message server that client is done sending packets
+			//Retransmit remaining dropped packets in list
+			System.out.println("Retransmitting dropped packets  -");
+			while(!droppedPackets.isEmpty()) {
+				int packet = droppedPackets.poll();
+				dataOutput.writeInt(packet);
+				totalSentCount++;
+				list.add(packet);
+				//System.out.println("Sending : " + packet);
+			}
 			dataOutput.writeInt(-1);
+			
+			acknowledgedByte = 0;
+			while(acknowledgedByte != -1) {
+				acknowledgedByte = dataInput.readInt();
+				list.remove(new Integer(acknowledgedByte));
+				//System.out.println("Acknowledged : " + acknowledgedByte);
+			}
+
+			System.out.println("List size : " + list.size());
+			System.out.println("Total sent count : "+ totalSentCount);
 		}
 
 		catch (IOException e) {
@@ -138,21 +163,20 @@ public class Client {
 		}
 	}
 	
-	private static void retransmitDroppedPackets(DataOutputStream dataOutput, DataInputStream dataInput, Queue<Integer> droppedPackets, Random rnd) throws IOException {
+	private static int retransmitDroppedPackets(DataOutputStream dataOutput, DataInputStream dataInput, Queue<Integer> droppedPackets, Random rnd, int index) throws IOException {
 		//Send all packets in the dropped list to the server
-		while(!droppedPackets.isEmpty()) {
+		while(index<windowSize && !droppedPackets.isEmpty() ) {
 			int packet = droppedPackets.poll();
 			
-			//Transmission with the same 1% probability as the original transmission
-			if(rnd.nextInt(100) == 0) {
+			//Generate probability of 1% by randomly sampling one integer from 100 values
+			if (rnd.nextInt(100) == 0) {
+				System.out.println("Dropped : " + packet);
 				droppedPackets.add(packet);
 				continue;
 			}
-			
-			dataOutput.writeInt(packet);
-			System.out.println("Retransmitting packet : " + packet);
-			int acknowledgedByte = dataInput.readInt();
-			System.out.println("Acknowledgement received : " + acknowledgedByte);
+			sendingArray[index] = packet;
+			index++;
 		}
+		return index;
 	}
 }
