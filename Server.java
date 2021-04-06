@@ -20,6 +20,9 @@ public class Server {
 	private static final String SUCCESS_MESSAGE = "Connection Success";
 	private static final int PACKET_COUNT = 32 ;
 	private static final int SEQ_LIMIT = 64;
+	private static List<Integer>windowSizeList = new ArrayList<Integer>(); 
+	private static List<Integer>totalPacketMissed = new ArrayList<Integer>();
+	private static List<Integer>toalSequenceReceived = new ArrayList<Integer>();
 
 	public static void main(String args[]) throws IOException, ClassNotFoundException {
 
@@ -42,12 +45,43 @@ public class Server {
 			clientCommunication(dataInput, dataOutput);
 		}
 
+		System.out.println("---- window Size------");
+		/*
+		// printing window size
+		for(int i=0;i<windowSizeList.size();i++)
+			System.out.println(windowSizeList.get(i));
+
+		System.out.println();
+		System.out.println();
+		System.out.println("---- packet Missed------");
+		*/
+
+		// printing packet missed
+		for(int i=0;i<totalPacketMissed.size();i++)
+			System.out.println(totalPacketMissed.get(i));
+
+
+		System.out.println();
+		System.out.println();
+		System.out.println("--- Sequence number -----");
+		/*
+		// printing sequence numnber
+		for(int i=0;i<toalSequenceReceived.size();i++)
+			System.out.println(toalSequenceReceived.get(i));
+
+	*/
+		// resting server
+		//int temp = dataInput.readInt();
+
 		// close resources
 		dataInput.close();
 		dataOutput.close();
 		socket.close();
 
 		// close the ServerSocket object
+
+		System.out.println();
+		System.out.println();
 		System.out.println("Shutting down server");
 		server.close();
 	}
@@ -77,11 +111,12 @@ public class Server {
 				// Sending window size to the client
 				System.out.println("Sending window size : " + windowSize);
 				dataOutput.writeInt(windowSize);
+				windowSizeList.add(windowSize);
 
 				while (true) {
 					// Read from the client
 					lastByteRead = dataInput.readInt();
-					;
+					toalSequenceReceived.add(lastByteRead);
 
 					// Client is done sending the window
 					if (lastByteRead == -1 || lastByteRead == -2) {
@@ -107,6 +142,9 @@ public class Server {
 						// Update expected byte for the next byte read
 						while (nextByteExpected != lastByteRead) {
 							missingPackets.add(nextByteExpected);
+							System.out.println("---nextByte---"+nextByteExpected);
+							System.out.println("---lastByte--"+lastByteRead);
+							totalPacketMissed.add(nextByteExpected);
 							nextByteExpected = (nextByteExpected % SEQ_LIMIT) + 1;
 						}
 
@@ -179,6 +217,8 @@ public class Server {
 				if(lastByteRead == -1)
 					break;
 				receivingBuffer.add(lastByteRead);
+				//totalPacketMissed.add(lastByteRead);
+				toalSequenceReceived.add(lastByteRead);
 				missingPackets.remove(new Integer(lastByteRead));
 				receivedPacketCount++;
 				lastByteRcvd++;
