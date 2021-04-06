@@ -1,6 +1,7 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -18,13 +19,17 @@ public class Server {
 	private static final int PORT = 5000;
 	private static final String INITIATE_MESSAGE = "Network";
 	private static final String SUCCESS_MESSAGE = "Connection Success";
-	private static final int PACKET_COUNT = 32 ;
+	private static final int PACKET_COUNT = 32;
 	private static final int SEQ_LIMIT = 64;
-	private static List<Integer>windowSizeList = new ArrayList<Integer>(); 
-	private static List<Integer>totalPacketMissed = new ArrayList<Integer>();
-	private static List<Integer>toalSequenceReceived = new ArrayList<Integer>();
+	private static final int GOODPUT_FREQ = 1000;
+
+	private static List<Integer> windowSizeList = new ArrayList<Integer>();
+	private static List<Integer> totalPacketMissed = new ArrayList<Integer>();
+	private static List<Integer> totalSequenceReceived = new ArrayList<Integer>();
 
 	public static void main(String args[]) throws IOException, ClassNotFoundException {
+
+		System.out.println("Server IP Address : " + InetAddress.getLocalHost());
 
 		// create the socket server object
 		server = new ServerSocket(PORT);
@@ -41,37 +46,33 @@ public class Server {
 		if (message.equals(INITIATE_MESSAGE)) {
 			System.out.println(SUCCESS_MESSAGE);
 			dataOutput.writeUTF(SUCCESS_MESSAGE);
-			
+
 			clientCommunication(dataInput, dataOutput);
 		}
 
 		System.out.println("---- window Size------");
 		/*
-		// printing window size
-		for(int i=0;i<windowSizeList.size();i++)
-			System.out.println(windowSizeList.get(i));
-
-		System.out.println();
-		System.out.println();
-		System.out.println("---- packet Missed------");
-		*/
+		 * // printing window size for(int i=0;i<windowSizeList.size();i++)
+		 * System.out.println(windowSizeList.get(i));
+		 * 
+		 * System.out.println(); System.out.println();
+		 * System.out.println("---- packet Missed------");
+		 */
 
 		// printing packet missed
-		for(int i=0;i<totalPacketMissed.size();i++)
+		for (int i = 0; i < totalPacketMissed.size(); i++)
 			System.out.println(totalPacketMissed.get(i));
-
 
 		System.out.println();
 		System.out.println();
 		System.out.println("--- Sequence number -----");
 		/*
-		// printing sequence numnber
-		for(int i=0;i<toalSequenceReceived.size();i++)
-			System.out.println(toalSequenceReceived.get(i));
-
-	*/
+		 * // printing sequence numnber for(int i=0;i<toalSequenceReceived.size();i++)
+		 * System.out.println(toalSequenceReceived.get(i));
+		 * 
+		 */
 		// resting server
-		//int temp = dataInput.readInt();
+		// int temp = dataInput.readInt();
 
 		// close resources
 		dataInput.close();
@@ -94,13 +95,10 @@ public class Server {
 		int windowSize = PACKET_COUNT;
 		int lastByteRead = 0;
 		int lastByteAcknowledged = 0;
-		int lastByteRcvd = 0;
 		int nextByteExpected = 1;
-		int missingPacketCount = 0;
 		int totalAcknowledged = 0;
-		int receivedPacketCount = 0;
 
-		double averageGoodput= 0;
+		double averageGoodput = 0;
 
 		boolean continueTranmission = true;
 
@@ -108,133 +106,117 @@ public class Server {
 
 			while (continueTranmission) {
 				process: {
-				// Sending window size to the client
-				System.out.println("Sending window size : " + windowSize);
-				dataOutput.writeInt(windowSize);
-				windowSizeList.add(windowSize);
 
-				while (true) {
-					// Read from the client
-					lastByteRead = dataInput.readInt();
-					toalSequenceReceived.add(lastByteRead);
+					// Sending window size to the client
+					dataOutput.writeInt(windowSize);
+					windowSizeList.add(windowSize);
 
-					// Client is done sending the window
-					if (lastByteRead == -1 || lastByteRead == -2) {
-						break;
-					} 
+					while (true) {
+						// Read from the client
+						lastByteRead = dataInput.readInt();
 
-					// Storing packets into the receiving buffer
-					receivingBuffer.add(lastByteRead);
-					receivedPacketCount++;
-
-					//System.out.println("Received : " + receivingBuffer[lastByteRcvd]);
-
-					// Checking for packets dropped at client end
-					if (missingPackets.contains(lastByteRead)) {
-						// Retranmission of dropped packets in progress
-						// Update the missing packets list
-
-						missingPackets.remove(new Integer(lastByteRead));
-
-					} else if (lastByteRead != nextByteExpected) {
-						// Byte read from received packet does match the expected byte
-						// Add expected bytes to the missing packet list
-						// Update expected byte for the next byte read
-						while (nextByteExpected != lastByteRead) {
-							missingPackets.add(nextByteExpected);
-							System.out.println("---nextByte---"+nextByteExpected);
-							System.out.println("---lastByte--"+lastByteRead);
-							totalPacketMissed.add(nextByteExpected);
-							nextByteExpected = (nextByteExpected % SEQ_LIMIT) + 1;
+						// Client is done sending the window
+						if (lastByteRead == -1 || lastByteRead == -2) {
+							break;
 						}
 
-						nextByteExpected = (lastByteRead) % SEQ_LIMIT + 1;
-						missingPacketCount++;
+						// Storing packets into the receiving buffer
+						receivingBuffer.add(lastByteRead);
+						totalSequenceReceived.add(lastByteRead);
 
+						// Checking for packets dropped at client end
+						if (missingPackets.contains(lastByteRead)) {
+							// Retranmission of dropped packets in progress
+							// Update the missing packets list
+
+							missingPackets.remove(new Integer(lastByteRead));
+
+						} else if (lastByteRead != nextByteExpected) {
+							// Byte read from received packet does match the expected byte
+							// Add expected bytes to the missing packet list
+							// Update expected byte for the next byte read
+							while (nextByteExpected != lastByteRead) {
+								missingPackets.add(nextByteExpected);
+								totalPacketMissed.add(nextByteExpected);
+
+								nextByteExpected = (nextByteExpected % SEQ_LIMIT) + 1;
+							}
+							nextByteExpected = (lastByteRead) % SEQ_LIMIT + 1;
+						} else {
+							// No packets are missing
+							// Update expected byte for next byte read
+
+							nextByteExpected = (lastByteRead) % SEQ_LIMIT + 1;
+						}
+
+						//Calculate the goodput after receiving every 1000 packets
+						if (totalSequenceReceived.size() % GOODPUT_FREQ == 0) {
+							double goodput = (totalSequenceReceived.size() * 1.0)
+									/ (totalSequenceReceived.size() + missingPackets.size());
+							averageGoodput += (goodput - averageGoodput) / (totalSequenceReceived.size() / GOODPUT_FREQ);
+							System.out.println(
+									"Goodput after receving " + totalSequenceReceived.size() + " : " + goodput);
+						}
+
+					}
+
+					//Client is sending the last window ; Acknowledge all packets in the receiving buffer
+					if (lastByteRead == -2) {
+						while (!receivingBuffer.isEmpty()) {
+							dataOutput.writeInt(receivingBuffer.poll());
+							lastByteAcknowledged = (lastByteAcknowledged + 1) % PACKET_COUNT;
+							totalAcknowledged++;
+						}
+						dataOutput.writeInt(-1);
+						continueTranmission = false;
+						break process;
 					} else {
-						// No packets are missing
-						// Update expected byte for next byte read
+						//Create random acknowledgement windows according to the available space in the buffer
+						int availableAcknowledgmentWindow = rnd.nextInt(receivingBuffer.size()) + 1;
 
-						nextByteExpected = (lastByteRead) % SEQ_LIMIT + 1;
+						// Set window size as the number of acknowledgements to be sent
+						windowSize = PACKET_COUNT - receivingBuffer.size() + availableAcknowledgmentWindow;
+
+						while (availableAcknowledgmentWindow != 0) {
+							// Sending acknowledgements for received packets
+							dataOutput.writeInt(receivingBuffer.poll());
+
+							lastByteAcknowledged = (lastByteAcknowledged + 1) % PACKET_COUNT;
+							availableAcknowledgmentWindow--;
+							totalAcknowledged++;
+						}
 					}
-					lastByteRcvd = (lastByteRcvd + 1) % PACKET_COUNT;
 
-
-					if (receivedPacketCount % 1000 == 0) { 
-						double goodput = (receivedPacketCount * 1.0) / (receivedPacketCount + missingPacketCount);
-						averageGoodput += (goodput - averageGoodput) / (receivedPacketCount/1000);
-						System.out.println("Goodput after receving " + receivedPacketCount + " : " +  goodput); 
-					}
-
-				}
-
-
-				if(lastByteRead == -2) {
-					while(!receivingBuffer.isEmpty()) {
-						dataOutput.writeInt(receivingBuffer.poll());
-						//System.out.println("Acknowledgement sent : " + receivingBuffer[lastByteAcknowledged] );
-						//receivingBuffer[lastByteAcknowledged] = 0;
-						lastByteAcknowledged = (lastByteAcknowledged + 1) % PACKET_COUNT;
-						totalAcknowledged++;
-					}
+					// Stop sending acknowledgements to client
 					dataOutput.writeInt(-1);
-					continueTranmission = false;
-					break process;
-				}else {
-					//int availableAcknowledgmentWindow = rnd.nextInt(PACKET_COUNT) + 1;
-					
-					int availableAcknowledgmentWindow = rnd.nextInt(receivingBuffer.size()) + 1; 
-					System.out.println("Available ack window : " +availableAcknowledgmentWindow);
-					// Set window size as the number of acknowledgements to be sent
-					windowSize = PACKET_COUNT - receivingBuffer.size() + availableAcknowledgmentWindow;
-					
-					//System.out.println("LastByteAcknowledged : " + lastByteAcknowledged);
-					
-					while (availableAcknowledgmentWindow != 0) {
-						
-						// Sending acknowledgements for received packets
-						dataOutput.writeInt(receivingBuffer.poll());
-						
-						//System.out.println("Acknowledgement sent : " +	receivingBuffer[lastByteAcknowledged]);
-						lastByteAcknowledged = (lastByteAcknowledged + 1) % PACKET_COUNT;
-						availableAcknowledgmentWindow--;
-						totalAcknowledged++;
-					}
 				}
 
-				System.out.println("Total Acknowledged : " + totalAcknowledged);
-				// Stop sending acknowledgements to client
-				dataOutput.writeInt(-1);
 			}
 
-			}
-
-			System.out.println("Retransmission -  ");
-			lastByteRcvd = 0;
-			while(true) {
+			//Receiving remaining retransmission from the client
+			while (true) {
 				lastByteRead = dataInput.readInt();
-				//System.out.println("Received : " +lastByteRead);
-				if(lastByteRead == -1)
+
+				if (lastByteRead == -1)
 					break;
 				receivingBuffer.add(lastByteRead);
-				//totalPacketMissed.add(lastByteRead);
-				toalSequenceReceived.add(lastByteRead);
+				totalSequenceReceived.add(lastByteRead);
+
 				missingPackets.remove(new Integer(lastByteRead));
-				receivedPacketCount++;
-				lastByteRcvd++;
 			}
 
+			//Sending acknowledgements for the re-sent packets
 			lastByteAcknowledged = 0;
-			while(!receivingBuffer.isEmpty()) {
+			while (!receivingBuffer.isEmpty()) {
 				dataOutput.writeInt(receivingBuffer.poll());
-				//System.out.println("Acknowledgement sent : " + receivingBuffer[lastByteAcknowledged] );
+
 				lastByteAcknowledged++;
 				totalAcknowledged++;
 			}
 			dataOutput.writeInt(-1);
-			
+
 			System.out.println("Total Acknowledged : " + totalAcknowledged);
-			System.out.println("Total Received : " + receivedPacketCount);
+			System.out.println("Total Received : " + totalSequenceReceived.size());
 			System.out.println("Average goodput : " + averageGoodput);
 
 		} catch (IOException e) {
