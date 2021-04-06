@@ -14,7 +14,8 @@ public class Client {
 	private static int[] sendingArray;
 	private static int windowSize = 0;
 	private static int totalSentCount = 0;
-	
+	private static Map<Integer,List<Integer>> retransmissionSequenceMap = new HashMap<Integer,List<Integer>>();
+	private static int globalRetransMissionCount = 0;
 
 	public static void main(String[] args)
 			throws UnknownHostException, IOException, ClassNotFoundException, InterruptedException {
@@ -44,6 +45,23 @@ public class Client {
 		} else {
 			System.out.println("Connection not established");
 		}
+
+		System.out.println("");
+
+		// printing sequences in each retransmission
+		for(Integer i :retransmissionSequenceMap.keySet()){
+			System.out.println("-----"+i+"-----");
+
+			for(Integer j:retransmissionSequenceMap.get(i)){
+
+				System.out.println(j);
+			}
+
+
+		}
+
+		//waiting for input
+		//int temp = dataInput.readInt();
 
 		// close resources
 		dataOutput.close();
@@ -143,15 +161,23 @@ public class Client {
 			
 			
 			//Retransmit remaining dropped packets in list
+			List<Integer> transmittingSequence = new ArrayList<Integer>();
+
+			if(!droppedPackets.isEmpty())
+				globalRetransMissionCount++;
+
 			System.out.println("Retransmitting dropped packets  -");
 			while(!droppedPackets.isEmpty()) {
 				int packet = droppedPackets.poll();
 				dataOutput.writeInt(packet);
+				transmittingSequence.add(packet);
 				totalSentCount++;
 				System.out.println("Sent count : " + totalSentCount);
 				list.add(packet);
 				//System.out.println("Sending : " + packet);
 			}
+
+			retransmissionSequenceMap.put(globalRetransMissionCount,transmittingSequence);
 			dataOutput.writeInt(-1);
 			
 			acknowledgedByte = 0;
@@ -171,6 +197,10 @@ public class Client {
 	}
 	
 	private static int retransmitDroppedPackets(DataOutputStream dataOutput, DataInputStream dataInput, Queue<Integer> droppedPackets, Random rnd, int index) throws IOException {
+		
+		List<Integer> transmittingSequence = new ArrayList<Integer>();
+		globalRetransMissionCount++;
+
 		//Send all packets in the dropped list to the server
 		while(index<windowSize && !droppedPackets.isEmpty() ) {
 			int packet = droppedPackets.poll();
@@ -182,12 +212,14 @@ public class Client {
 				continue;
 			}
 			sendingArray[index] = packet;
-			
 			dataOutput.writeInt(sendingArray[index]);
+			transmittingSequence.add(sendingArray[index]);
 			totalSentCount++;
 			
 			index++;
 		}
+
+		retransmissionSequenceMap.put(globalRetransMissionCount,transmittingSequence);
 		return index;
 	}
 }
