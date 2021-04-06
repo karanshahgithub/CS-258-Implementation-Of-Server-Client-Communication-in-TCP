@@ -1,3 +1,11 @@
+/*
+ * 
+ * @author : 
+ * Karan Shashin Shah  SJSU ID : 014490671
+ * Shreya Satish Bhajikhaye SJSU ID : 014522560
+ * 
+ * 
+ */
 
 import java.io.*;
 import java.net.*;
@@ -7,9 +15,9 @@ public class Client {
 
 	private static final String INITIATE_MESSAGE = "Network";
 	private static final int PORT = 5000;
-	private static final int PACKET_COUNT = 1000;
-	private static final int SEQ_LIMIT = 64;
-	private static final int RETRANSMISSION_INTERVAL = 10;
+	private static final int PACKET_COUNT = 10000000;
+	private static final int SEQ_LIMIT = 65536;
+	private static final int RETRANSMISSION_INTERVAL = 100;
 
 	private static int[] sendingArray;
 	private static int windowSize = 0;
@@ -49,20 +57,15 @@ public class Client {
 		}
 
 		System.out.println("Total packets sent : " + totalSentCount);
-
+		File retransmissionFile = new File("C:\\Users\\admin\\Desktop\\retransmissionTable.txt");
+		FileWriter fw = new FileWriter(retransmissionFile);
 		// printing sequences in each retransmission
 		for (Integer i : retransmissionSequenceMap.keySet()) {
-			System.out.println("-----" + i + "-----");
-
-			for (Integer j : retransmissionSequenceMap.get(i)) {
-
-				System.out.println(j);
-			}
+			fw.append(i + " ----- " + retransmissionSequenceMap.get(i).size());
+			fw.append("\n");
 		}
-
-		// waiting for input
-		// int temp = dataInput.readInt();
-
+		fw.close();
+		
 		// close resources
 		dataOutput.close();
 		dataInput.close();

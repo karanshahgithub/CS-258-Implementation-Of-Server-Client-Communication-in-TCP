@@ -1,5 +1,17 @@
+/*
+ * 
+ * @author : 
+ * Karan Shashin Shah  SJSU ID : 014490671
+ * Shreya Satish Bhajikhaye SJSU ID : 014522560
+ * 
+ * 
+ */
+
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -19,8 +31,8 @@ public class Server {
 	private static final int PORT = 5000;
 	private static final String INITIATE_MESSAGE = "Network";
 	private static final String SUCCESS_MESSAGE = "Connection Success";
-	private static final int PACKET_COUNT = 32;
-	private static final int SEQ_LIMIT = 64;
+	private static final int PACKET_COUNT = 32768;
+	private static final int SEQ_LIMIT = 65536;
 	private static final int GOODPUT_FREQ = 1000;
 
 	private static List<Integer> windowSizeList = new ArrayList<Integer>();
@@ -50,37 +62,48 @@ public class Server {
 			clientCommunication(dataInput, dataOutput);
 		}
 
-		System.out.println("---- window Size------");
-		/*
-		 * // printing window size for(int i=0;i<windowSizeList.size();i++)
-		 * System.out.println(windowSizeList.get(i));
-		 * 
-		 * System.out.println(); System.out.println();
-		 * System.out.println("---- packet Missed------");
-		 */
+		File windowFile = new File("C:\\Users\\admin\\Desktop\\window.txt");
+		FileWriter windowfw = new FileWriter(windowFile);
+		
+		// printing window size
+		for (int i = 0; i < windowSizeList.size(); i++) {
+			windowfw.append(String.valueOf(windowSizeList.get(i)));
+			windowfw.append("\n");
+		}
+		windowfw.close();
+		
 
+		System.out.println();
+		System.out.println();
+		
+		File missedFile = new File("C:\\Users\\admin\\Desktop\\missed.txt");
+		FileWriter missedfw = new FileWriter(missedFile);
+		
 		// printing packet missed
-		for (int i = 0; i < totalPacketMissed.size(); i++)
-			System.out.println(totalPacketMissed.get(i));
+		for (int i = 0; i < totalPacketMissed.size(); i++) {
+			missedfw.append(String.valueOf(totalPacketMissed.get(i)));
+			missedfw.append("\n");
+		}
+		missedfw.close();
 
 		System.out.println();
 		System.out.println();
-		System.out.println("--- Sequence number -----");
-		/*
-		 * // printing sequence numnber for(int i=0;i<toalSequenceReceived.size();i++)
-		 * System.out.println(toalSequenceReceived.get(i));
-		 * 
-		 */
-		// resting server
-		// int temp = dataInput.readInt();
-
+		
+		File recvFile = new File("C:\\Users\\admin\\Desktop\\received.txt");
+		FileWriter recvfw = new FileWriter(recvFile);
+		// printing sequence numnber
+		for (int i = 0; i < totalSequenceReceived.size(); i++) {
+			recvfw.append(String.valueOf(totalSequenceReceived.get(i)));
+			recvfw.append("\n");
+		}
+		recvfw.close();
+			
 		// close resources
 		dataInput.close();
 		dataOutput.close();
 		socket.close();
 
 		// close the ServerSocket object
-
 		System.out.println();
 		System.out.println();
 		System.out.println("Shutting down server");
@@ -149,18 +172,18 @@ public class Server {
 							nextByteExpected = (lastByteRead) % SEQ_LIMIT + 1;
 						}
 
-						//Calculate the goodput after receiving every 1000 packets
+						// Calculate the goodput after receiving every 1000 packets
 						if (totalSequenceReceived.size() % GOODPUT_FREQ == 0) {
 							double goodput = (totalSequenceReceived.size() * 1.0)
 									/ (totalSequenceReceived.size() + missingPackets.size());
-							averageGoodput += (goodput - averageGoodput) / (totalSequenceReceived.size() / GOODPUT_FREQ);
-							System.out.println(
-									"Goodput after receving " + totalSequenceReceived.size() + " : " + goodput);
+							averageGoodput += (goodput - averageGoodput)
+									/ (totalSequenceReceived.size() / GOODPUT_FREQ);
 						}
 
 					}
 
-					//Client is sending the last window ; Acknowledge all packets in the receiving buffer
+					// Client is sending the last window ; Acknowledge all packets in the receiving
+					// buffer
 					if (lastByteRead == -2) {
 						while (!receivingBuffer.isEmpty()) {
 							dataOutput.writeInt(receivingBuffer.poll());
@@ -171,7 +194,8 @@ public class Server {
 						continueTranmission = false;
 						break process;
 					} else {
-						//Create random acknowledgement windows according to the available space in the buffer
+						// Create random acknowledgement windows according to the available space in the
+						// buffer
 						int availableAcknowledgmentWindow = rnd.nextInt(receivingBuffer.size()) + 1;
 
 						// Set window size as the number of acknowledgements to be sent
@@ -193,7 +217,7 @@ public class Server {
 
 			}
 
-			//Receiving remaining retransmission from the client
+			// Receiving remaining retransmission from the client
 			while (true) {
 				lastByteRead = dataInput.readInt();
 
@@ -205,7 +229,7 @@ public class Server {
 				missingPackets.remove(new Integer(lastByteRead));
 			}
 
-			//Sending acknowledgements for the re-sent packets
+			// Sending acknowledgements for the re-sent packets
 			lastByteAcknowledged = 0;
 			while (!receivingBuffer.isEmpty()) {
 				dataOutput.writeInt(receivingBuffer.poll());
